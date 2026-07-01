@@ -1,7 +1,7 @@
 from sqlalchemy.orm import aliased
 
 from app.database.models import *
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, delete
 
 
 async def set_user(tg_id):
@@ -9,18 +9,21 @@ async def set_user(tg_id):
     async with async_session() as session:
         user = await session.scalar(select(User).where(User.tg_id == tg_id))
         if not user:
-            new_user = User(
-                tg_id=tg_id
-            )
+            new_user = User(tg_id=tg_id)
             session.add(new_user)
             await session.commit()
 
-async def add_set(set_number, weight, reps, exercise_id,user_id):
+async def get_user_id(tg_id):
+    """Получение внутреннего ID пользователя по Telegram ID"""
+    async with async_session() as session:
+        user = await session.scalar(select(User).where(User.tg_id == tg_id))
+        return user.id if user else None
+
+async def add_set(set_number, weight, reps, exercise_id, user_id):
     """Добавление сета в бд"""
     async with async_session() as session:
         async with session.begin():
             new_set = Sets(
-                # workout_id=workout,
                 set_number=set_number,
                 weight=weight,
                 reps=reps,
@@ -28,17 +31,42 @@ async def add_set(set_number, weight, reps, exercise_id,user_id):
                 user_id=user_id,
             )
             session.add(new_set)
-            await session.commit()
 
-async def get_exercises(muscle_group_id):
-    """Получение упражнений соответствующие группе мышц"""
+async def get_user_exercises(user_id: int, muscle_group_id: int):
+    """Персональные упражнения пользователя по группе мышц"""
     async with async_session() as session:
-        return await session.scalars(select(Exercise).where(Exercise.muscle_group_id == muscle_group_id))
+        result = await session.scalars(
+            select(Exercise).where(
+                Exercise.user_id == user_id,
+                Exercise.muscle_group_id == muscle_group_id
+            )
+        )
+        return result.all()
+
+async def add_user_exercise(user_id: int, muscle_group_id: int, name: str) -> Exercise:
+    """Добавить персональное упражнение"""
+    async with async_session() as session:
+        async with session.begin():
+            exercise = Exercise(name=name.strip(), muscle_group_id=muscle_group_id, user_id=user_id)
+            session.add(exercise)
+        await session.refresh(exercise)
+        return exercise
+
+async def delete_user_exercise(user_id: int, exercise_id: int) -> bool:
+    """Удалить упражнение пользователя вместе со всеми сетами"""
+    async with async_session() as session:
+        async with session.begin():
+            exercise = await session.get(Exercise, exercise_id)
+            if not exercise or exercise.user_id != user_id:
+                return False
+            await session.execute(delete(Sets).where(Sets.exercise_id == exercise_id))
+            await session.delete(exercise)
+        return True
 
 async def select_muscle_group():
     """Получение групп мышц"""
     async with async_session() as session:
-        return await session.scalars(select(MuscleGroup))
+        return await session.scalars(select(MuscleGroup).order_by(MuscleGroup.sort_order))
 
 async def get_name_muscle_group(muscle_group_id):
     """Получение одной группы мышц по id"""

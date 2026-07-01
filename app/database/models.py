@@ -1,10 +1,14 @@
 import datetime
+import os
 
 from sqlalchemy import BigInteger, ForeignKey, String, DateTime, func
 from sqlalchemy.ext.asyncio import AsyncAttrs, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-engine = create_async_engine(url='sqlite+aiosqlite:///db.sqlite3')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = os.path.join(BASE_DIR, 'db.sqlite3')
+
+engine = create_async_engine(url=f'sqlite+aiosqlite:///{DB_PATH}')
 
 async_session = async_sessionmaker(engine)
 
@@ -23,6 +27,7 @@ class MuscleGroup(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255))
+    sort_order: Mapped[int] = mapped_column(default=0)
 
 
 class Exercise(Base):
@@ -30,8 +35,8 @@ class Exercise(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
-
     muscle_group_id: Mapped[int] = mapped_column(ForeignKey('muscle_groups.id'))
+    user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'), nullable=True, default=None)
 
 
 class Sets(Base):

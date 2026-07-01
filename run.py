@@ -1,10 +1,16 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, F
+import os
+
+from aiogram import Bot, Dispatcher
+from dotenv import load_dotenv
 
 from app.handlers import router
-from config import TOKEN
 from app.database.models import async_main
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+TOKEN = os.getenv("TOKEN")
 
 
 async def main():
